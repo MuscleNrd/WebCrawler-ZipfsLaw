@@ -13,10 +13,11 @@ public class WebCrawler
 	private static String CURRENT_URL_HEAD = "";
 	private static final String PREFIX = "LINK - ";
 	private static int COUNTER = 1;
-	private static int LINKS_PER_SEED_LIMIT = 15;
+	private static int TOTAL_LINKS = 0;
+	private static int LINKS_PER_SEED_LIMIT = 5;
 	private static final String SUFFIX = ".txt";
 	private static Vector<String> SITESTOVISIT = new Vector<>();
-	private static final String[] START_SEEDS = {"https://www.funimation.com/", "https://www.google.com/","https://www.yahoo.com/"};
+	private static final String[] START_SEEDS = {"http://dmoz-odp.org/", "https://www.google.com/","https://www.ebay.com/"};
 
 
 	public static void main(String[] args) throws Exception
@@ -25,6 +26,8 @@ public class WebCrawler
 		{
 			try
 			{
+				System.out.println("Starting website: " + seed);
+				System.out.println(" ----------- Grabbing Robots.txt -----------");
 				Robots robots = new Robots(download_robots_txt(get_robots_URL(seed), get_parsed_URL_Title(seed)));
 				connect_to_Seed(seed, robots);
 			}
@@ -79,30 +82,35 @@ public class WebCrawler
 			try
 			{
 				it = elements.iterator();
+				String element = it.next().toString();
 				// Connect to website, downloading the HTML into "document"
-				Document document = Jsoup.connect(it.next().toString()).get();
-				if (robots.isAllowed(document.location()))
+				if (robots.isAllowed(element))
 				{
-					System.out.println("Connecting to: " + document.location());
+					Document document = Jsoup.connect(element).get();
+					System.out.println("Connecting to: " + element);
+					// Save HTML into the website's root
+					save_html_text_to_file(document, CURRENT_URL_HEAD);
+					// Save ALL links into queue and remove current element
 					it.remove();
+					add_links_to_queue(document.select("a[href]"), elements);
+					TOTAL_LINKS += SITESTOVISIT.size();
+
 				}
 				else
 				{
 					it.remove();
 					continue;
 				}
-				// Save HTML into the website's root
-				save_html_text_to_file(document, CURRENT_URL_HEAD);
-				// Save ALL links into queue
-				add_links_to_queue(document.select("a[href]"), elements);
 			} catch (Exception e)
 			{
 				System.out.println(e);
 				it.remove();
 				continue;
 			}
-
 		}
+		SITESTOVISIT.clear();
+		// TODO CREATE LOG.TXT OR SOMETHING THAT RECORDS TOTAL LINKS SO WE KNOW HOW MANY WE FOUND WHILE TRAVERSING.
+		System.out.println("TOTAL LINKS: " + TOTAL_LINKS);
 	}
 
 	private static void connect_to_Seed(String seed, Robots robots) throws Exception
