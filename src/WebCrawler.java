@@ -4,23 +4,28 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import java.io.*;
 import java.net.URL;
-import java.util.Iterator;
-import java.util.Scanner;
-import java.util.Vector;
+import java.nio.Buffer;
+import java.util.*;
 
 public class WebCrawler
 {
 	private static String CURRENT_URL_HEAD = "";
 	private static final String PREFIX = "LINK - ";
 	private static int COUNTER = 1;
-	private static int TOTAL_LINKS = 0;
-	private static int LINKS_PER_SEED_LIMIT = 5;
+	private static int LINKS_PER_SEED_LIMIT = 50;
 	private static final String SUFFIX = ".txt";
 	private static Vector<String> SITESTOVISIT = new Vector<>();
+	private static HashMap<String, Integer> csv = new HashMap<>();
 	private static final String[] START_SEEDS = {"http://dmoz-odp.org/", "https://www.google.com/","https://www.ebay.com/"};
 
 
 	public static void main(String[] args) throws Exception
+	{
+		start();
+		Zipfs zipfs = new Zipfs("Repository\\");
+	}
+
+	private static void start() throws Exception
 	{
 		for(String seed : START_SEEDS)
 		{
@@ -37,6 +42,23 @@ public class WebCrawler
 				continue;
 			}
 		}
+		create_csv();
+	}
+
+	private static void create_csv() throws Exception
+	{
+		File dir = new File("Repository\\");
+		File csvFile = new File(dir,"Report-OutLinks.csv");
+		csvFile.createNewFile();
+
+		BufferedWriter out = new BufferedWriter(new FileWriter(csvFile));
+		out.write("URL,LINK-COUNT\n");
+		for (Map.Entry<String,Integer> entry : csv.entrySet())
+		{
+			out.write(entry.getKey() + "," + entry.getValue() + "\n");
+		}
+
+		out.close();
 	}
 
 	private static String get_robots_URL(String parsed_URL)
@@ -93,8 +115,8 @@ public class WebCrawler
 					// Save ALL links into queue and remove current element
 					it.remove();
 					add_links_to_queue(document.select("a[href]"), elements);
-					TOTAL_LINKS += SITESTOVISIT.size();
-
+					// Save element count from current URL
+					csv.putIfAbsent(element,document.select("a[href]").size());
 				}
 				else
 				{
@@ -110,7 +132,6 @@ public class WebCrawler
 		}
 		SITESTOVISIT.clear();
 		// TODO CREATE LOG.TXT OR SOMETHING THAT RECORDS TOTAL LINKS SO WE KNOW HOW MANY WE FOUND WHILE TRAVERSING.
-		System.out.println("TOTAL LINKS: " + TOTAL_LINKS);
 	}
 
 	private static void connect_to_Seed(String seed, Robots robots) throws Exception
@@ -125,6 +146,8 @@ public class WebCrawler
 		save_html_text_to_file(document, CURRENT_URL_HEAD);
 		// Grab ALL Links
 		Elements elements = document.select("a[href]");
+		// Save element count from current URL
+		csv.putIfAbsent(seed,elements.size());
 		// Save ALL links into queue
 		add_links_to_queue(elements, SITESTOVISIT);
 		// Connect to all elements
