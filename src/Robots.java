@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 public class Robots extends WebCrawler
@@ -18,9 +19,8 @@ public class Robots extends WebCrawler
 	private static final String SPEAK_REQUEST_URL_NOT_REFERENCED = "The URL requested does not exist in Robots.txt, sir.";
 
 
-	protected Robots(File robots_txt, String website_root) throws Exception
+	protected Robots(File robots_txt) throws Exception
 	{
-		this.WEBSITE_ROOT = website_root;
 		populate_hashmap(robots_txt);
 	}
 
@@ -70,7 +70,20 @@ public class Robots extends WebCrawler
 	{
 		try
 		{
-			boolean result = map_robot_listing.get(target);
+			boolean result = true;
+
+			Iterator it =  map_robot_listing.entrySet().iterator();
+
+			// Search hashmap for anything that contains the URL we want to connect to, if found, check if it's allowed or not.
+			while (it.hasNext())
+			{
+				Map.Entry pair = (Map.Entry)it.next();
+				if (target.contains(pair.getKey().toString()))
+				{
+					if (!(boolean)pair.getValue())
+						result = false;
+				}
+			}
 			if (DEBUG)
 				robot_speak(SPEAK_CKECKING_DIR_AGAINST_ROBOTS, result == true ? ("\"" + target + "\"" + "... ALLOWED!") : ("\"" + target + "\"" + "...DISALLOWED!"));
 

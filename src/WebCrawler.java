@@ -2,10 +2,10 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-
-import javax.xml.stream.events.StartDocument;
 import java.io.*;
+import java.net.URL;
 import java.util.Iterator;
+import java.util.Scanner;
 import java.util.Vector;
 
 public class WebCrawler
@@ -13,45 +13,89 @@ public class WebCrawler
 	private static String CURRENT_URL_HEAD = "";
 	private static final String PREFIX = "LINK - ";
 	private static int COUNTER = 1;
+	private static int LINKS_PER_SEED_LIMIT = 15;
 	private static final String SUFFIX = ".txt";
 	private static Vector<String> SITESTOVISIT = new Vector<>();
-	private static Vector<String> ITEMSTOREMOVE = new Vector<>();
-	private static Vector<String> NEWSITESTOADD = new Vector<>();
-	private static int CURRENT_DEPTH = 1;
-	private static final int DEPTHTOCRAWL = 2;
-	private static boolean ITERATORS_EMPTY = false;
-	private static final String[] START_SEEDS = {"http://google.com/"};
+	private static final String[] START_SEEDS = {"https://www.funimation.com/", "https://www.google.com/","https://www.yahoo.com/"};
 
 
 	public static void main(String[] args) throws Exception
 	{
-		Document document = Jsoup.connect(START_SEEDS[0] + "robots.txt").get();
-		System.out.println(document.clone());
-		// TODO
-		//https://stackoverflow.com/questions/25731346/reading-robot-txt-with-jsoup-line-by-line
-		// For this issue ^
-		//save_html_text_to_file(document,"Test");
-		//Robots robot = new Robots(new File("lol"),"lol");
-		//connect_to_Seeds(START_SEEDS);
+		for(String seed : START_SEEDS)
+		{
+			try
+			{
+				Robots robots = new Robots(download_robots_txt(get_robots_URL(seed), get_parsed_URL_Title(seed)));
+				connect_to_Seed(seed, robots);
+			}
+			catch (Exception e)
+			{
+				System.out.println("Website: " + seed + " - Robots.txt failed to download for some reason... Skipping!");
+				continue;
+			}
+		}
 	}
 
-	private static void connect_to_Elements(Vector<String> elements)
+	private static String get_robots_URL(String parsed_URL)
+	{
+		return parsed_URL + "/robots.txt";
+	}
+
+	private static File download_robots_txt(String url_to_Robotrs, String curr_dir)
+	{
+		try
+		{
+			URL url = new URL(url_to_Robotrs);
+			File directory = new File("Repository\\" + curr_dir);
+			directory.mkdirs();
+			File tmp = new File(directory, "robots.txt");
+			tmp.createNewFile();
+
+			// Attempt download of file, and separate lines by \n
+			Scanner s = new Scanner(url.openStream()).useDelimiter("\n");
+
+			// Write the file contents to robots.txt
+			BufferedWriter out = new BufferedWriter(new FileWriter(tmp));
+
+			while (s.hasNext())
+			{
+				out.write(s.nextLine() + "\n");
+			}
+			out.close();
+
+			return tmp;
+		} catch (IOException e)
+		{
+			System.out.println(e);
+			return null;
+		}
+	}
+
+	private static void connect_to_Elements(Vector<String> elements, Robots robots)
 	{
 		Iterator it = elements.iterator();
-		while(it.hasNext() || CURRENT_DEPTH > DEPTHTOCRAWL)
+		while (it.hasNext() && COUNTER <= LINKS_PER_SEED_LIMIT)
 		{
 			try
 			{
 				it = elements.iterator();
 				// Connect to website, downloading the HTML into "document"
 				Document document = Jsoup.connect(it.next().toString()).get();
-				it.remove();
+				if (robots.isAllowed(document.location()))
+				{
+					System.out.println("Connecting to: " + document.location());
+					it.remove();
+				}
+				else
+				{
+					it.remove();
+					continue;
+				}
 				// Save HTML into the website's root
-				save_html_text_to_file(document,CURRENT_URL_HEAD);
+				save_html_text_to_file(document, CURRENT_URL_HEAD);
 				// Save ALL links into queue
 				add_links_to_queue(document.select("a[href]"), elements);
-			}
-			catch(Exception e)
+			} catch (Exception e)
 			{
 				System.out.println(e);
 				it.remove();
@@ -61,39 +105,27 @@ public class WebCrawler
 		}
 	}
 
-	private static void connect_to_Seeds(String[] seeds) throws Exception
+	private static void connect_to_Seed(String seed, Robots robots) throws Exception
 	{
+		COUNTER = 1;
 
-		for(String URL : START_SEEDS)
-		{
-			COUNTER = 1;
-
-			if (!SITESTOVISIT.isEmpty())
-			{
-				Iterator it = ITEMSTOREMOVE.iterator();
-				while(it.hasNext())
-					SITESTOVISIT.remove(it.next());
-			}
-
-			String start_url = URL;
-			CURRENT_URL_HEAD = get_parsed_URL_Title(start_url);
-			print("Current URL: %s...", start_url);
-			// Connect to website, downloading the HTML into "document"
-			Document document = Jsoup.connect(start_url).get();
-			// Save HTML into the website's root
-			save_html_text_to_file(document,CURRENT_URL_HEAD);
-			// Grab ALL Links
-			Elements elements = document.select("a[href]");
-			// Save ALL links into queue
-			add_links_to_queue(elements, SITESTOVISIT);
-			// Connect to all elements
-			connect_to_Elements(SITESTOVISIT);
-		}
+		CURRENT_URL_HEAD = get_parsed_URL_Title(seed);
+		print("Current URL: %s...", seed);
+		// Connect to website, downloading the HTML into "document"
+		Document document = Jsoup.connect(seed).get();
+		// Save HTML into the website's root
+		save_html_text_to_file(document, CURRENT_URL_HEAD);
+		// Grab ALL Links
+		Elements elements = document.select("a[href]");
+		// Save ALL links into queue
+		add_links_to_queue(elements, SITESTOVISIT);
+		// Connect to all elements
+		connect_to_Elements(SITESTOVISIT, robots);
 	}
 
 	private static String get_parsed_URL_Title(String originalURL)
 	{
-		return originalURL.replace("/","").replace(":","").replace("https","").replace("http","");
+		return originalURL.replace("/", "").replace(":", "").replace("https", "").replace("http", "");
 	}
 
 	private static void add_links_to_queue(Elements links, Vector queue)
@@ -110,7 +142,7 @@ public class WebCrawler
 		// Connect to website, downloading the HTML into "document"
 		document = Jsoup.connect(start_url).get();
 		// Save HTML into the website's root
-		save_html_text_to_file(document,start_url);
+		save_html_text_to_file(document, start_url);
 		// Grab all links within the root HTML
 		Elements test = new Elements();
 
@@ -130,9 +162,7 @@ public class WebCrawler
 
 	private static boolean make_directory(String dirName)
 	{
-		if (new File(dirName).mkdirs())
-			return true;
-		return false;
+		return new File(dirName).mkdirs();
 	}
 
 	public static void print(String message, Object... args)

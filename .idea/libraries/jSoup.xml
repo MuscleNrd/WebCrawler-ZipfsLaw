@@ -1,0 +1,10 @@
+<component name="libraryTable">
+  <library name="jSoup">
+    <CLASSES>
+      <root url="file://C:/Program Files/Java/jSoup" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+    <jarDirectory url="file://C:/Program Files/Java/jSoup" recursive="false" />
+  </library>
+</component>
